@@ -7,11 +7,6 @@
 
 static const int POINT_SIZE = 3;
 
-static void plot_point(int x, int y, GContext *ctx) {
-  graphics_context_set_fill_color(ctx, GColorBlack);
-  graphics_fill_rect(ctx, GRect(x, y, POINT_SIZE, POINT_SIZE), 0, GCornerNone);
-}
-
 static int bg_to_y(int height, int bg, int min, int max, bool fit_in_bounds) {
   // Graph lower bound, graph upper bound
   int graph_min = get_prefs()->bottom_of_graph;
@@ -35,6 +30,17 @@ static int bg_to_y_for_line(int height, int bg) {
   return bg_to_y(height, bg, -1, height - 1, false);
 }
 
+static void plot_point(int x, int y, int height, GContext *ctx) {
+  if ( bg_to_y_for_point(height, get_prefs()->top_of_range) > y ) {
+    graphics_context_set_fill_color(ctx, GColorFolly);
+  } else if (y > bg_to_y_for_point(height, get_prefs()->bottom_of_range)) {
+    graphics_context_set_fill_color(ctx, GColorFolly);
+  } else {
+    graphics_context_set_fill_color(ctx, GColorElectricUltramarine);
+  }
+  graphics_fill_rect(ctx, GRect(x, y, POINT_SIZE, POINT_SIZE), 0, GCornerNone);
+}
+
 static void graph_update_proc(Layer *layer, GContext *ctx) {
   unsigned int i, x, y;
   int height = layer_get_bounds(layer).size.h;
@@ -48,7 +54,7 @@ static void graph_update_proc(Layer *layer, GContext *ctx) {
     }
     x = POINT_SIZE * (i - graph_staleness_padding());
     y = bg_to_y_for_point(height, bg);
-    plot_point(x, y, ctx);
+    plot_point(x, y, height, ctx);
   }
 
   // Target range bounds

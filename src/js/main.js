@@ -131,13 +131,60 @@ function getCustomUrl(config, callback) {
   getURL(config.statusUrl, callback);
 }
 
+function getBasal(config, callback) {
+  var iob = '~';
+  getJSON(config.nightscout_url + '/api/v1/treatments.json?find[eventType]=Temp+Basal&count=1', function(err, iobs) {
+    if (err) {
+      return callback(err);
+    }
+    
+    if (iobs.length && iobs[0]['duration'] && Date.now() < (Date.parse(iobs[0]['created_at']) + iobs[0]['duration']*60000) ) {
+      //temp basal active
+      console.log("temp: " + iobs[0]);
+      console.log(Date.parse(iobs[0]['created_at']) + iobs[0]['duration']*60000);
+      iob = 'Rate: ' + iobs[0]['absolute'].toFixed(1).toString() + 'u/h';
+      callback(null, iob);
+    }//end active temp
+    else {
+      getJSON(config.nightscout_url + '/api/v1/profile.json', function(err, iobs) {
+      if (err) {
+        return callback(err);
+      }
+      //TODO check what rate is active -- currently only using one so can skip the check
+      console.log("basal: " + iobs[0]);
+      iob = 'Rate: ' + iobs[0]['basal'][0]['value'] + 'u/h';
+      callback(null,iob);
+      });//get scheduled basal rate
+    }//end else
+  });//get most reccent temp basal treatment (might not be relevant)
+  /*
+  if (iob === '~') {
+    getJSON(config.nightscout_url + '/api/v1/profile.json', function(err, iobs) {
+    if (err) {
+      return callback(err);
+    }
+    //TODO check what rate is active -- currently only using one so can skip the check
+    console.log("basal: " + iobs[0]);
+    iob = 'Rate: ' + iobs[0]['basal'][0]['value'] + 'u/h';
+    //callback(null,iob);
+  });//get scheduled basal rate
+  }
+
+  return iob;
+  */
+  callback(null, iob);
+}
+
 function getStatusText(config, callback) {
-  var defaultFn = getIOB;
+  /*
+  var defaultFn = getBasal;
   var fn = {
-    'pumpiob': getIOB,
-    'customurl': getCustomUrl,
+    'pumpiob': getBasal,
+    'customurl': getBasal,
   }[config.statusContent];
   (fn || defaultFn)(config, callback);
+  */
+  getBasal(config, callback);
 }
 
 function getSGVsDateDescending(config, callback) {

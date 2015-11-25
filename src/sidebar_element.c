@@ -75,6 +75,13 @@ static void update_last_bg(SidebarElement *el, DictionaryIterator *data) {
   static char last_bg_buffer[8];
   int mgdl = dict_find(data, APP_KEY_LAST_SGV)->value->int32;
   format_bg(last_bg_buffer, sizeof(last_bg_buffer), mgdl, false, get_prefs()->mmol);
+  if ( mgdl > get_prefs()->top_of_range) {
+    text_layer_set_text_color(el->last_bg_text, GColorFolly);
+  } else if (mgdl < get_prefs()->bottom_of_range){
+    text_layer_set_text_color(el->last_bg_text, GColorFolly);
+  } else {
+    text_layer_set_text_color(el->last_bg_text, GColorElectricUltramarine);
+  }
   text_layer_set_text(el->last_bg_text, last_bg_buffer);
 }
 
