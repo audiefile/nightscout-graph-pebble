@@ -53,8 +53,77 @@ By default, the phone -> Pebble and Nightscout -> phone icons appear after 10 mi
 
 File an issue to report a bug or provide feedback for future development.
 
+## Testing
+
+Since this software displays real-time health data, it is important to be able to verify that it works as expected. This project includes two tools to aid testing: a mock Nightscout server and automated screenshot testing.
+
+To install testing dependencies, use `pip`:
+```
+pip install -r requirements.txt
+```
+
+These instructions assume you are using the [Pebble SDK]. You can build and run the project with a command like:
+```
+pebble clean && pebble build && pebble install --emulator aplite && pebble logs
+```
+
+### Mock Nightscout server
+
+The `test/` directory includes a server which uses the [Flask] framework. To run it:
+```
+MOCK_SERVER_PORT=5555 python test/server.py
+```
+
+Then open the configuration page to set your Nightscout host to `http://localhost:5555`:
+```
+pebble emu-app-config
+# ...make configuration changes in web browser...
+```
+
+To set the data that will be returned by the `sgv.json` endpoint:
+```
+vi sgv-data.json
+# ...edit mock data...
+curl -H "Content-type: application/json" -d "@sgv-data.json" http://localhost:5555/set-sgv
+```
+
+### Automated screenshot testing
+
+The best method of automated integration testing for Pebble is to take screenshots under different scenarios. To run tests:
+```
+bash test/do_screenshots.sh
+```
+
+This will build the watchface, run it in the emulator, take a screenshot for each test, and generate an HTML file with the results. Each test consists of watchface configuration and mock data. To add a new test case, follow the examples in `test/test_screenshots.py`.
+
+Automated verification of the screenshots is coming soon. For now, you manually inspect them.
+
+### Testing the configuration page
+
+To test changes to the configuration page, set `BUILD_ENV` to `development`. This will build the watchface to point to the local config page (`file:///...`). Using `emu-app-config --file` won't work because it [bypasses the JS][emu-app-config-file] which adds the current config to the query string.
+```
+BUILD_ENV=development pebble build
+pebble install --emulator aplite
+pebble emu-app-config
+```
+
+### JavaScript unit tests
+
+There are a few [Mocha] unit tests to verify the transformation of Nightscout data in PebbleKit JS. These are run with [Node].
+
+```
+cd test/js
+npm install
+npm test
+```
+
 ## Disclaimer
 
 This project is intended for educational and informational purposes only. It is not FDA approved and should not be used to make medical decisions. It is neither affiliated with nor endorsed by Dexcom.
 
+[emu-app-config-file]: https://github.com/pebble/pebble-tool/blob/0e51fa/pebble_tool/commands/emucontrol.py#L116
+[Flask]: http://flask.pocoo.org/
+[Mocha]: https://mochajs.org/
+[Node]: https://nodejs.org/
 [pbw]: https://raw.githubusercontent.com/mddub/nightscout-graph-pebble/master/release/nightscout-graph-pebble.pbw
+[Pebble SDK]: https://developer.getpebble.com/sdk/
