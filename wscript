@@ -1,5 +1,7 @@
 import os
 
+from waflib.Task import Task
+
 DEFAULT_BUILD_ENV = 'production'
 BUILD_ENV = os.environ.get('BUILD_ENV', DEFAULT_BUILD_ENV)
 
@@ -17,6 +19,32 @@ ENV_CONSTANTS_OVERRIDES = {
     }
 }
 
+TEST_HEADERS = """
+#define IS_TEST_BUILD 1
+"""
+
+def generate_testing_headers_maybe(ctx):
+    target = 'src/generated/test_maybe.h'
+    if BUILD_ENV == 'test':
+        with open(target, 'w') as f:
+            f.write(TEST_HEADERS)
+    else:
+        open(target, 'w').close()
+
+class concat_and_invoke_js(Task):
+    def run(self):
+        constants_json_str = self.inputs[0].read()
+        if BUILD_ENV in ENV_CONSTANTS_OVERRIDES.keys():
+            import json
+            constants_json_str = json.dumps(dict(
+                json.loads(constants_json_str),
+                **ENV_CONSTANTS_OVERRIDES[BUILD_ENV]
+            ))
+        main_call = "main({});".format(constants_json_str)
+
+        all_js = "\n".join([node.read() for node in self.inputs[1:]])
+        self.outputs[0].write(all_js + main_call)
+
 top = '.'
 out = 'build'
 
@@ -29,7 +57,8 @@ def configure(ctx):
 def build(ctx):
     ctx.load('pebble_sdk')
 
-    build_worker = os.path.exists('worker_src')
+    ctx.add_pre_fun(generate_testing_headers_maybe)
+
     binaries = []
 
     for p in ctx.env.TARGET_PLATFORMS:
@@ -39,32 +68,14 @@ def build(ctx):
         ctx.pbl_program(source=ctx.path.ant_glob('src/**/*.c'),
         target=app_elf)
 
-        if build_worker:
-            worker_elf='{}/pebble-worker.elf'.format(ctx.env.BUILD_DIR)
-            binaries.append({'platform': p, 'app_elf': app_elf, 'worker_elf': worker_elf})
-            ctx.pbl_worker(source=ctx.path.ant_glob('worker_src/**/*.c'),
-            target=worker_elf)
-        else:
-            binaries.append({'platform': p, 'app_elf': app_elf})
+        binaries.append({'platform': p, 'app_elf': app_elf})
 
     ctx.set_group('bundle')
 
-    constants_json_str = ctx.path.find_resource('src/js/constants.json').read()
-
-    if BUILD_ENV in ENV_CONSTANTS_OVERRIDES.keys():
-        try:
-            import simplejson as json
-        except ImportError:
-            import json
-        constants_json_str = json.dumps(dict(
-            json.loads(constants_json_str),
-            **ENV_CONSTANTS_OVERRIDES[BUILD_ENV]
-        ))
-
-    main_call = "main({});".format(constants_json_str)
-
-    all_js = "\n".join([node.read() for node in ctx.path.ant_glob('src/js/**/*.js')])
-    out_js_node = ctx.path.make_node('build/pebble-js-app.js')
-    out_js_node.write(all_js + main_call)
+    out_js_node = ctx.path.find_or_declare('pebble-js-app.js')
+    js = concat_and_invoke_js(env=ctx.env)
+    js.set_inputs([ctx.path.find_resource('src/js/constants.json')] + ctx.path.ant_glob('src/js/**/*.js'))
+    js.set_outputs(out_js_node)
+    ctx.add_to_group(js)
 
     ctx.pbl_bundle(binaries=binaries, js=out_js_node)

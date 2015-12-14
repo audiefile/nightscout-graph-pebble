@@ -12,7 +12,7 @@
           <div class="item alert">
             <strong>An update is available!</strong>
             <br>
-            Your watch is running v<span id="running-version">?</span>. The current version is v<span id="available-version">?</span>. Some of these options may not work until you update. Visit the GitHub page for <strong>nightscout-graph-pebble</strong>.
+            Your watch is running v<span id="running-version">?</span>. The current version is v<span id="available-version">?</span>. Some of these options may not work until you update. Visit the GitHub page for <strong>Urchin CGM</strong>.
           </div>
         </div>
       </div>
@@ -125,10 +125,12 @@
             &nbsp;
             <select id="statusContent" name="statusContent" dir="rtl" class="item-select">
               <option value="rigbattery" class="item-select-option">Uploader battery level</option>
-              <option value="basal" class="item-select-option">Current/temp basal - OpenAPS</option>
+              <option value="rawdata" class="item-select-option">Raw Dexcom reading</option>
+              <option value="rig-raw" class="item-select-option">Uploader battery, Dexcom raw</option>
+              <option value="basal" class="item-select-option">Active basal - OpenAPS</option>
               <option value="pumpiob" class="item-select-option">Pump IOB - MM Connect</option>
-              <option value="customtext" class="item-select-option">Custom text</option>
               <option value="customurl" class="item-select-option">Custom URL</option>
+              <option value="customtext" class="item-select-option">Custom text</option>
             </select>
           </label>
         </div>

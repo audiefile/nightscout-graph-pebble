@@ -4,7 +4,7 @@ A Pebble watchface for showing [Nightscout](https://github.com/nightscout/cgm-re
 
 To install, enable Developer Mode in the Pebble app on your phone, then open [this pbw file][pbw] in the Pebble app.
 
-Still very much work-in-progress. Probably soon to be renamed, too.
+Urchin CGM is an **U**nopinionated, **R**idiculously **C**onfigurable **H**uman **I**nterface to **N**ightscout. It's still a work-in-progress.
 
 ## To configure (for now):
 * Set your Nightscout host and display units on the phone. You can customize the graph:
@@ -84,7 +84,7 @@ To set the data that will be returned by the `sgv.json` endpoint:
 ```
 vi sgv-data.json
 # ...edit mock data...
-curl -H "Content-type: application/json" -d "@sgv-data.json" http://localhost:5555/set-sgv
+curl -d @sgv-data.json http://localhost:5555/set-sgv
 ```
 
 ### Automated screenshot testing
@@ -125,5 +125,5 @@ This project is intended for educational and informational purposes only. It is 
 [Flask]: http://flask.pocoo.org/
 [Mocha]: https://mochajs.org/
 [Node]: https://nodejs.org/
-[pbw]: https://raw.githubusercontent.com/mddub/nightscout-graph-pebble/master/release/nightscout-graph-pebble.pbw
+[pbw]: https://raw.githubusercontent.com/mddub/urchin-cgm/master/release/urchin-cgm.pbw
 [Pebble SDK]: https://developer.getpebble.com/sdk/

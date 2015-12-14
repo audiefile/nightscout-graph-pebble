@@ -79,7 +79,13 @@ var Data = function(c) {
   };
 
   d.getCustomUrl = function(config, callback) {
-    d.getURL(config.statusUrl, callback);
+    d.getURL(config.statusUrl, function(err, data) {
+      if (err) {
+        callback(err);
+      } else {
+        callback(null, (data || '-').substr(0, 255));
+      }
+    });
   };
 
   d.getRigBatteryLevel = function(config, callback) {
@@ -88,10 +94,71 @@ var Data = function(c) {
         return callback(err);
       }
       if (deviceStatus && deviceStatus.length && new Date(deviceStatus[0]['created_at']) >= new Date() - c.DEVICE_STATUS_RECENCY_THRESHOLD_SECONDS * 1000) {
-        callback(null, 'Rig ' + deviceStatus[0]['uploaderBattery'] + '%');
+        callback(null, deviceStatus[0]['uploaderBattery'] + '%');
       } else {
         callback(null, '-');
       }
+    });
+  };
+
+  d.getRawData = function(config, callback) {
+    d.getJSON(config.nightscout_url + '/api/v1/entries/cal.json?count=1', function(err, calRecord) {
+      if (err) {
+        return callback(err);
+      }
+      if (calRecord && calRecord.length && calRecord.length > 0) {
+        d.getJSON(config.nightscout_url + '/api/v1/entries/sgv.json?count=2', function(err, sgvRecords) {
+          if (err) {
+            return callback(err);
+          }
+          if (sgvRecords && sgvRecords.length) {
+            var noiseStr = c.DEXCOM_NOISE_STRINGS[sgvRecords[0]['noise']];
+
+            sgvRecords.sort(function(a, b) {
+              return a['date'] - b['date'];
+            });
+            var sgvString = sgvRecords.map(function(bg) {
+              return _getRawMgdl(bg, calRecord[0]);
+            }).map(function(mgdl) {
+              return (config.mmol && !isNaN(mgdl)) ? (mgdl / 18.0).toFixed(1) : mgdl;
+            }).join(' ');
+
+            callback(null, (noiseStr ? noiseStr + ' ' : '') + sgvString);
+          } else {
+            callback(null, '-');
+          }
+        });
+      } else {
+        callback(null, '-');
+      }
+    });
+  };
+
+  function _getRawMgdl(sgvRecord, calRecord) {
+    if (sgvRecord.unfiltered) {
+      if (sgvRecord.sgv && sgvRecord.sgv >= 40 && sgvRecord.sgv <= 400 && sgvRecord.filtered) {
+        var ratio = calRecord.scale * (sgvRecord.filtered - calRecord.intercept) / calRecord.slope / sgvRecord.sgv;
+        return Math.round(calRecord.scale * (sgvRecord.unfiltered - calRecord.intercept) / calRecord.slope / ratio);
+      } else {
+        return Math.round(calRecord.scale * (sgvRecord.unfiltered - calRecord.intercept) / calRecord.slope);
+      }
+    } else {
+      return undefined;
+    }
+  }
+
+  d.getRigBatteryAndRawData = function(config, callback) {
+    d.getRigBatteryLevel(config, function(err, battery) {
+      if (err) {
+        return callback(err);
+      }
+      d.getRawData(config, function(err, raw) {
+        if (err) {
+          return callback(err);
+        }
+        var line = [battery, raw].filter(function(v) { return v !== '-'; }).join(' ') || '-';
+        callback(null, line);
+      });
     });
   };
 
@@ -153,8 +220,8 @@ var Data = function(c) {
     }
   }
 
-  d.getCurrentBasal = function(config, callback) {
-    // adapted from @audiefile: https://github.com/mddub/nightscout-graph-pebble/pull/1
+  d.getActiveBasal = function(config, callback) {
+    // adapted from @audiefile: https://github.com/mddub/urchin-cgm/pull/1
     _getCurrentProfileBasal(config, function(err, profileBasal) {
       if (err) {
         callback(err);
@@ -177,13 +244,15 @@ var Data = function(c) {
   };
 
   d.getStatusText = function(config, callback) {
-    var defaultFn = d.getIOB;
+    var defaultFn = d.getRigBatteryLevel;
     var fn = {
-      'pumpiob': d.getIOB,
-      'basal': d.getCurrentBasal,
       'rigbattery': d.getRigBatteryLevel,
-      'customtext': d.getCustomText,
+      'rawdata': d.getRawData,
+      'rig-raw': d.getRigBatteryAndRawData,
+      'basal': d.getActiveBasal,
+      'pumpiob': d.getIOB,
       'customurl': d.getCustomUrl,
+      'customtext': d.getCustomText,
     }[config.statusContent];
     (fn || defaultFn)(config, callback);
   };
