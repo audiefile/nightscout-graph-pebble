@@ -1,10 +1,11 @@
 /* jshint browser: true */
-/* global console, Pebble, Data */
+/* global console, Pebble, Data, Format */
 /* exported main */
 
 function main(c) {
 
   var data = Data(c);
+  var format = Format(c);
   var config;
 
   function mergeConfig(config, defaults) {
@@ -18,101 +19,9 @@ function main(c) {
     return out;
   }
 
-  function sgvDataError(e) {
-    console.log(e);
+  function dataFetchError(e) {
+    console.log(e.stack);
     sendMessage({msgType: c.MSG_TYPE_ERROR});
-  }
-
-  function graphArray(sgvs) {
-    var endTime = sgvs.length > 0 ? sgvs[0]['date'] : new Date();
-    var noEntry = {
-      'date': Infinity,
-      'sgv': 0
-    };
-    var i;
-
-    var graphed = [];
-    var xs = [];
-    for(i = 0; i <= c.SGV_FETCH_SECONDS; i += c.INTERVAL_SIZE_SECONDS) {
-      graphed.push(noEntry);
-      xs.push(endTime - i);
-    }
-
-    for(i = 0; i < sgvs.length; i++) {
-      var min = Infinity;
-      var xi;
-      // Don't graph missing sgvs or error codes
-      if(sgvs[i]['sgv'] === undefined || sgvs[i]['sgv'] <= c.DEXCOM_ERROR_CODE_MAX) {
-        continue;
-      }
-      // Find the x value closest to this sgv's date
-      for(var j = 0; j < xs.length; j++) {
-        if(Math.abs(sgvs[i]['date'] - xs[j]) < min) {
-          min = Math.abs(sgvs[i]['date'] - xs[j]);
-          xi = j;
-        }
-      }
-      // Assign it if it's the closest sgv to that x
-      if(min < c.INTERVAL_SIZE_SECONDS && Math.abs(sgvs[i]['date'] - xs[xi]) < Math.abs(graphed[xi]['date'] - xs[xi])) {
-        graphed[xi] = sgvs[i];
-      }
-    }
-
-    var ys = graphed.map(function(entry) { return entry['sgv']; });
-
-    return ys;
-  }
-
-  function lastSgv(sgvs) {
-    return sgvs.length > 0 ? parseInt(sgvs[0]['sgv'], 10) : 0;
-  }
-
-  function directionToTrend(direction) {
-    return {
-      'NONE': 0,
-      'DoubleUp': 1,
-      'SingleUp': 2,
-      'FortyFiveUp': 3,
-      'Flat': 4,
-      'FortyFiveDown': 5,
-      'SingleDown': 6,
-      'DoubleDown': 7,
-      'NOT COMPUTABLE': 8,
-      'RATE OUT OF RANGE': 9,
-    }[direction] || 0;
-  }
-
-  function lastTrendNumber(sgvs) {
-    if (sgvs.length === 0) {
-      return 0;
-    }
-
-    var trend = sgvs[0]['trend'];
-    if (!isNaN(parseInt(trend)) && trend >= 0 && trend <= 9) {
-      return trend;
-    } else if (sgvs[0]['direction'] !== undefined) {
-      return directionToTrend(sgvs[0]['direction']);
-    } else {
-      return 0;
-    }
-  }
-
-  function lastDelta(ys) {
-    if (ys[1] === 0) {
-      return c.NO_DELTA_VALUE;
-    } else {
-      return ys[0] - ys[1];
-    }
-  }
-
-  function recency(sgvs) {
-    if (sgvs.length === 0) {
-      // TODO
-      return 99 * 60 * 60;
-    } else {
-      var seconds = Date.now() / 1000 - sgvs[0]['date'];
-      return Math.floor(seconds);
-    }
   }
 
   function sendMessage(data) {
@@ -120,54 +29,92 @@ function main(c) {
     Pebble.sendAppMessage(data);
   }
 
-  function requestAndSendBGs() {
-    function onData(sgvs, statusText) {
+  function requestAndSendData() {
+    function onData(sgvs, bolusHistory, basalHistory, statusText) {
       try {
-        var ys = graphArray(sgvs);
+        var endTime = sgvs.length > 0 ? sgvs[0]['date'] : new Date();
+        var ys = format.sgvArray(endTime, sgvs);
+
+        var boluses = format.bolusGraphArray(endTime, bolusHistory);
+        var basals = format.basalGraphArray(endTime, basalHistory, config);
+        var graphExtra = format.graphExtraArray(boluses, basals);
+
         sendMessage({
           msgType: c.MSG_TYPE_DATA,
-          recency: recency(sgvs),
+          recency: format.recency(sgvs),
           sgvCount: ys.length,
           // XXX: divide BG by 2 to fit into 1 byte
           sgvs: ys.map(function(y) { return Math.min(255, Math.floor(y / 2)); }),
-          lastSgv: lastSgv(sgvs),
-          trend: lastTrendNumber(sgvs),
-          delta: lastDelta(ys),
+          lastSgv: format.lastSgv(sgvs),
+          trend: format.lastTrendNumber(sgvs),
+          delta: format.lastDelta(ys),
           statusText: statusText,
+          graphExtra: graphExtra,
         });
       } catch (e) {
-        sgvDataError(e);
+        dataFetchError(e);
       }
     }
 
-    data.getSGVsDateDescending(config, function(err, sgvs) {
-      if (err) {
-        // error fetching sgvs is unrecoverable
-        sgvDataError(err);
-      } else {
-        data.getStatusText(config, function(err, statusText) {
-          if (err) {
-            // error fetching status bar text is okay
-            console.log(err);
-            statusText = '-';
+    var sgvs = data.getSGVsDateDescending(config);
+    var bolusHistory = config.bolusTicks ? data.getBolusHistory(config) : Promise.resolve([]);
+    var basalHistory = config.basalGraph ? data.getBasalHistory(config) : Promise.resolve([]);
+    // recover from status text errors
+    var statusText = data.getStatusText(config).catch(function(e) {
+      console.log(e.stack);
+      return '-';
+    });
+
+    Promise.all([sgvs, bolusHistory, basalHistory, statusText])
+      .then(function(results) {
+        onData.apply(this, results);
+      })
+      .catch(dataFetchError);
+  }
+
+  function getLayout(config) {
+    return config.layout === 'custom' ? config.customLayout : c.LAYOUTS[config.layout];
+  }
+
+  function countElementsForPebble(layout) {
+    return layout.elements.filter(function(elementConfig) {
+      return elementConfig['enabled'];
+    }).length;
+  }
+
+  function encodeElementsForPebble(layout) {
+    var out = [];
+    layout.elements.forEach(function(elementConfig) {
+      if (elementConfig['enabled']) {
+        out = out.concat(c.PROPERTIES.map(function(prop) {
+          if (typeof elementConfig[prop] === 'boolean') {
+            return elementConfig[prop] ? 1 : 0;
+          } else {
+            return elementConfig[prop];
           }
-          onData(sgvs, statusText);
-        });
+        }));
       }
     });
+    return out;
   }
 
   function sendPreferences() {
     sendMessage({
       msgType: c.MSG_TYPE_PREFERENCES,
-      mmol: config.mmol,
+      mmol: config.mmol ? 1 : 0,
       topOfGraph: config.topOfGraph,
       topOfRange: config.topOfRange,
       bottomOfRange: config.bottomOfRange,
       bottomOfGraph: config.bottomOfGraph,
       hGridlines: config.hGridlines,
-      timeAlign: c.ALIGN[config.timeAlign],
-      batteryLoc: c.BATTERY_LOC[config.batteryLoc],
+      batteryAsNumber: config.batteryAsNumber ? 1 : 0,
+      basalGraph: config.basalGraph ? 1 : 0,
+      basalHeight: config.basalHeight,
+      updateEveryMinute: config.updateEveryMinute ? 1 : 0,
+      timeAlign: c.ALIGN[getLayout(config).timeAlign],
+      batteryLoc: c.BATTERY_LOC[getLayout(config).batteryLoc],
+      numElements: countElementsForPebble(getLayout(config)),
+      elements: encodeElementsForPebble(getLayout(config)),
     });
   }
 
@@ -184,30 +131,58 @@ function main(c) {
     }
 
     Pebble.addEventListener('showConfiguration', function() {
-      Pebble.openURL(c.CONFIG_URL + '?version=' + c.VERSION + '&current=' + encodeURIComponent(JSON.stringify(config)));
+      var platform = 'unknown';
+      var firmware = '0.0.0';
+      if (Pebble.getActiveWatchInfo) {
+        platform = Pebble.getActiveWatchInfo()['platform'];
+        firmware = ['major', 'minor', 'patch'].map(function(part) {
+          return Pebble.getActiveWatchInfo()['firmware'][part];
+        }).join('.');
+        if (Pebble.getActiveWatchInfo()['firmware']['suffix']) {
+          firmware += '.' + Pebble.getActiveWatchInfo()['firmware']['suffix'];
+        }
+      }
+      var query = [
+        ['version', c.VERSION],
+        ['pf', platform],
+        ['fw', firmware],
+        ['at', Pebble.getAccountToken()],
+        ['wt', Pebble.getWatchToken()],
+        ['current', encodeURIComponent(JSON.stringify(config))],
+      ].map(function(pair) {
+        return pair.join('=');
+      }).join('&');
+      Pebble.openURL(c.CONFIG_URL + '?' + query);
     });
 
     Pebble.addEventListener('webviewclosed', function(event) {
       var configStr = decodeURIComponent(event.response);
+      var newConfig;
       try {
-        var newConfig = JSON.parse(configStr);
-        config = mergeConfig(newConfig, c.DEFAULT_CONFIG);
-        localStorage.setItem(c.LOCAL_STORAGE_KEY_CONFIG, JSON.stringify(config));
-        console.log('Preferences updated: ' + JSON.stringify(config));
-        sendPreferences();
-        requestAndSendBGs();
+        newConfig = JSON.parse(configStr);
       } catch (e) {
         console.log(e);
         console.log('Bad config from webview: ' + configStr);
       }
+
+      if (newConfig) {
+        if (newConfig.nightscout_url !== config.nightscout_url) {
+          data.clearCache();
+        }
+        config = mergeConfig(newConfig, c.DEFAULT_CONFIG);
+        localStorage.setItem(c.LOCAL_STORAGE_KEY_CONFIG, JSON.stringify(config));
+        console.log('Preferences updated: ' + JSON.stringify(config));
+        sendPreferences();
+        requestAndSendData();
+      }
     });
 
     Pebble.addEventListener('appmessage', function() {
-      requestAndSendBGs();
+      requestAndSendData();
     });
 
     // Send data immediately after the watchface is launched
-    requestAndSendBGs();
+    requestAndSendData();
   });
 
 }

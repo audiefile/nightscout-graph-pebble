@@ -1,45 +1,62 @@
 #include "app_keys.h"
+#include "fonts.h"
 #include "layout.h"
 #include "preferences.h"
 #include "time_element.h"
 
-// https://forums.getpebble.com/discussion/7147/text-layer-padding
-#define ACTUAL_TEXT_HEIGHT_42 30
-#define PADDING_TOP_42 12
-#define PADDING_BOTTOM_42 8
-
 #include "generated/test_maybe.h"
-#define TESTING_TIME_DISPLAY "11:23"
+#define TESTING_TIME_DISPLAY "13:37"
 
 static BatteryComponent *create_battery_component(Layer *parent, unsigned int battery_loc) {
   GRect bounds = element_get_bounds(parent);
   int x = -1;
   int y = -1;
+  bool align_right;
   if (get_prefs()->battery_loc == BATTERY_LOC_TIME_TOP_LEFT) {
     x = battery_component_vertical_padding();
     y = 0;
+    align_right = false;
   } else if (get_prefs()->battery_loc == BATTERY_LOC_TIME_TOP_RIGHT) {
     x = bounds.size.w - battery_component_width() - battery_component_vertical_padding();
     y = 0;
+    align_right = true;
   } else if (get_prefs()->battery_loc == BATTERY_LOC_TIME_BOTTOM_LEFT) {
     x = battery_component_vertical_padding();
     y = bounds.size.h - battery_component_height();
+    align_right = false;
   } else if (get_prefs()->battery_loc == BATTERY_LOC_TIME_BOTTOM_RIGHT) {
     x = bounds.size.w - battery_component_width() - battery_component_vertical_padding();
     y = bounds.size.h - battery_component_height();
+    align_right = true;
+  }
+  if (bounds.size.h <= battery_component_height()) {
+    y = (bounds.size.h - battery_component_height()) / 2 - 1;
   }
   if (x != -1) {
-    return battery_component_create(parent, x, y);
+    return battery_component_create(parent, x, y, align_right);
   } else {
     return NULL;
   }
 }
 
+static uint8_t choose_font_for_height(uint8_t height) {
+  uint8_t choices[] = {FONT_42_BOLD, FONT_34_NUMBERS, FONT_28_BOLD, FONT_24_BOLD, FONT_18_BOLD};
+  for(uint8_t i = 0; i < ARRAY_LENGTH(choices); i++) {
+    if (get_font(choices[i]).height < height) {
+      return choices[i];
+    }
+  }
+  return choices[ARRAY_LENGTH(choices) - 1];
+}
+
 TimeElement* time_element_create(Layer* parent) {
   GRect bounds = element_get_bounds(parent);
+
   const int time_margin = 2;
-  TextLayer* time_text = text_layer_create(GRect(time_margin, (bounds.size.h - ACTUAL_TEXT_HEIGHT_42) / 2 - PADDING_TOP_42, bounds.size.w - 2 * time_margin, ACTUAL_TEXT_HEIGHT_42 + PADDING_TOP_42 + PADDING_BOTTOM_42));
-  text_layer_set_font(time_text, fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD));
+  FontChoice font = get_font(choose_font_for_height(bounds.size.h));
+
+  TextLayer* time_text = text_layer_create(GRect(time_margin, (bounds.size.h - font.height) / 2 - font.padding_top, bounds.size.w - 2 * time_margin, font.height + font.padding_top + font.padding_bottom));
+  text_layer_set_font(time_text, fonts_get_system_font(font.key));
   text_layer_set_background_color(time_text, GColorClear);
   text_layer_set_text_color(time_text, element_fg(parent));
 

@@ -1,18 +1,20 @@
 import errno
+import json
 import os
 import subprocess
 import time
 from datetime import datetime
 
 import requests
-import simplejson as json
 
+PLATFORM = 'aplite'
 PORT = os.environ['MOCK_SERVER_PORT']
 MOCK_HOST = 'http://localhost:{}'.format(PORT)
 
-BASE_CONFIG = json.loads(
+CONSTANTS = json.loads(
     open(os.path.join(os.path.dirname(__file__), '../src/js/constants.json')).read()
-)['DEFAULT_CONFIG']
+)
+BASE_CONFIG = CONSTANTS['DEFAULT_CONFIG']
 
 def set_config(config):
     _post_mock_server('/set-config', config)
@@ -28,7 +30,7 @@ def pebble_install_and_run():
     _call('pebble clean')
     # TODO ensure this is called from the main project directory
     _call('pebble build')
-    _call('pebble install --emulator aplite')
+    _call('pebble install --emulator {}'.format(PLATFORM))
     # Give the watchface time to show up
     time.sleep(5)
 
@@ -48,12 +50,12 @@ def pebble_set_config():
     Nothing crazy about that.
     """
     _call(
-      'pebble emu-app-config',
+      'pebble emu-app-config --emulator {}'.format(PLATFORM),
       env=dict(os.environ, BROWSER=os.path.join(os.path.dirname(__file__), 'background_curl.sh'))
     )
 
 def pebble_screenshot(filename):
-    _call('pebble screenshot --no-open {}'.format(filename))
+    _call('pebble screenshot --emulator {} --no-open {}'.format(PLATFORM, filename))
 
 def _call(command_str, **kwargs):
     print command_str

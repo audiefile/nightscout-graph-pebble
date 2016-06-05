@@ -1,22 +1,122 @@
 {
-   "VERSION" : "0.0.3",
+   "VERSION" : "0.0.9",
 
    "CONFIG_URL" : "https://mddub.github.io/urchin-cgm/config/",
    "LOCAL_STORAGE_KEY_CONFIG" : "config",
 
    "DEFAULT_CONFIG" : {
-      "hGridlines" : 50,
-      "statusContent" : "rigbattery",
-      "batteryLoc" : "statusRight",
       "nightscout_url" : "",
-      "topOfGraph" : 250,
       "mmol" : false,
-      "timeAlign" : "center",
-      "statusUrl" : "",
+      "topOfGraph" : 250,
       "topOfRange" : 200,
       "bottomOfRange" : 70,
-      "bottomOfGraph" : 40
+      "bottomOfGraph" : 40,
+      "hGridlines" : 50,
+      "statusContent" : "none",
+      "statusLine1" : "none",
+      "statusLine2" : "none",
+      "statusLine3" : "none",
+      "statusRawCount" : 2,
+      "statusUrl" : "",
+      "statusJsonUrl" : "",
+      "statusText" : "",
+      "statusOpenAPSNetBasal": false,
+      "statusOpenAPSEvBG": false,
+      "batteryAsNumber": false,
+      "bolusTicks": false,
+      "basalGraph": false,
+      "basalHeight": 15,
+      "updateEveryMinute": false,
+      "layout" : "a",
+      "advancedLayout": false,
+      "customLayout": {
+         "elements": [
+            {"el": 3, "enabled": true, "width": 100, "height": 20, "black": false, "bottom": false, "right": false},
+            {"el": 0, "enabled": true, "width": 100, "height": 0, "black": false, "bottom": true, "right": false},
+            {"el": 1, "enabled": false, "width": 100, "height": 0, "black": false, "bottom": false, "right": false},
+            {"el": 4, "enabled": true, "width": 100, "height": 20, "black": true, "bottom": false, "right": false},
+            {"el": 2, "enabled": true, "width": 100, "height": 32, "black": false, "bottom": false, "right": false}
+         ],
+         "batteryLoc" : "timeBottomLeft",
+         "timeAlign" : "right"
+      }
    },
+
+   "LAYOUTS": {
+      "a": {
+         "elements": [
+            {"el": 3, "enabled": true, "width": 100, "height": 0, "black": false, "bottom": true, "right": false},
+            {"el": 0, "enabled": true, "width": 75, "height": 52, "black": false, "bottom": true, "right": true},
+            {"el": 1, "enabled": true, "width": 25, "height": 52, "black": false, "bottom": true, "right": false},
+            {"el": 2, "enabled": true, "width": 100, "height": 12, "black": false, "bottom": false, "right": false},
+            {"el": 4, "enabled": false, "width": 100, "height": 0, "black": false, "bottom": false, "right": false}
+         ],
+         "batteryLoc" : "statusRight",
+         "timeAlign" : "center"
+      },
+      "b": {
+         "elements": [
+            {"el": 0, "enabled": true, "width": 75, "height": 52, "black": false, "bottom": true, "right": true},
+            {"el": 1, "enabled": true, "width": 25, "height": 52, "black": false, "bottom": true, "right": false},
+            {"el": 2, "enabled": true, "width": 100, "height": 10, "black": false, "bottom": false, "right": false},
+            {"el": 3, "enabled": true, "width": 100, "height": 0, "black": false, "bottom": false, "right": false},
+            {"el": 4, "enabled": false, "width": 100, "height": 0, "black": false, "bottom": false, "right": false}
+         ],
+         "batteryLoc" : "statusRight",
+         "timeAlign" : "center"
+      },
+      "c": {
+         "elements": [
+            {"el": 0, "enabled": true, "width": 100, "height": 35, "black": false, "bottom": false, "right": false},
+            {"el": 1, "enabled": false, "width": 100, "height": 35, "black": false, "bottom": false, "right": false},
+            {"el": 4, "enabled": true, "width": 100, "height": 25, "black": true, "bottom": false, "right": false},
+            {"el": 2, "enabled": true, "width": 100, "height": 10, "black": false, "bottom": false, "right": false},
+            {"el": 3, "enabled": true, "width": 100, "height": 0, "black": false, "bottom": false, "right": false}
+         ],
+         "batteryLoc" : "statusRight",
+         "timeAlign" : "center"
+      },
+      "d": {
+         "elements": [
+            {"el": 3, "enabled": true, "width": 100, "height": 23, "black": false, "bottom": true, "right": false},
+            {"el": 0, "enabled": true, "width": 100, "height": 0, "black": false, "bottom": true, "right": false},
+            {"el": 1, "enabled": false, "width": 100, "height": 0, "black": false, "bottom": true, "right": false},
+            {"el": 4, "enabled": true, "width": 100, "height": 25, "black": false, "bottom": false, "right": false},
+            {"el": 2, "enabled": false, "width": 100, "height": 0, "black": false, "bottom": false, "right": false}
+         ],
+         "batteryLoc" : "timeTopRight",
+         "timeAlign" : "left"
+      },
+      "e": {
+         "elements": [
+            {"el": 0, "enabled": true, "width": 75, "height": 0, "black": false, "bottom": true, "right": true},
+            {"el": 1, "enabled": true, "width": 25, "height": 0, "black": false, "bottom": true, "right": false},
+            {"el": 2, "enabled": true, "width": 100, "height": 44, "black": false, "bottom": false, "right": false},
+            {"el": 3, "enabled": true, "width": 100, "height": 14, "black": false, "bottom": false, "right": false},
+            {"el": 4, "enabled": false, "width": 100, "height": 0, "black": false, "bottom": false, "right": false}
+         ],
+         "batteryLoc" : "timeBottomLeft",
+         "timeAlign" : "right"
+      }
+   },
+
+   "ELEMENTS": [
+      "GRAPH_ELEMENT",
+      "SIDEBAR_ELEMENT",
+      "STATUS_BAR_ELEMENT",
+      "TIME_AREA_ELEMENT",
+      "BG_ROW_ELEMENT"
+   ],
+
+   "PROPERTIES": [
+      "el",
+      "enabled",
+      "width",
+      "height",
+      "black",
+      "bottom",
+      "right"
+   ],
 
    "ALIGN" : {
       "left" : 0,
@@ -37,6 +137,11 @@
    "MSG_TYPE_DATA" : 1,
    "MSG_TYPE_PREFERENCES" : 2,
 
+   "GRAPH_EXTRA_BOLUS_OFFSET": 0,
+   "GRAPH_EXTRA_BOLUS_BITS": 1,
+   "GRAPH_EXTRA_BASAL_OFFSET": 1,
+   "GRAPH_EXTRA_BASAL_BITS": 5,
+
    "SGV_FETCH_SECONDS" : 14400,
    "INTERVAL_SIZE_SECONDS" : 300,
    "FETCH_EXTRA" : 5,
@@ -46,6 +151,21 @@
 
    "NO_DELTA_VALUE" : 65536,
    "DEXCOM_ERROR_CODE_MAX" : 12,
+
+   "NIGHTSCOUT_DIRECTION_TO_TREND": {
+      "NONE": 0,
+      "DoubleUp": 1,
+      "SingleUp": 2,
+      "FortyFiveUp": 3,
+      "Flat": 4,
+      "FortyFiveDown": 5,
+      "SingleDown": 6,
+      "DoubleDown": 7,
+      "NOT COMPUTABLE": 8,
+      "NOT_COMPUTABLE": 8,
+      "RATE OUT OF RANGE": 9,
+      "RATE_OUT_OF_RANGE": 9
+   },
 
    "DEXCOM_NOISE_STRINGS": {
        "1": "Cln",

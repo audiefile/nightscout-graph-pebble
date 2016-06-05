@@ -1,4 +1,5 @@
 import os
+import urllib
 
 import requests
 from flask import Flask, request
@@ -26,7 +27,7 @@ def auto_config():
     in the cache by the most recent POST to /set-config.
     """
     return_to = request.args.get('return_to')
-    requests.get(return_to + cache.get('config'))
+    requests.get(return_to + urllib.quote(cache.get('config')))
     return ''
 
 @app.route('/set-config', methods=['post'])
@@ -42,6 +43,18 @@ def sgv():
 def set_sgv():
     cache.set('sgv', _get_post_data(request))
     return ''
+
+@app.route('/api/v1/devicestatus.json')
+def devicestatus():
+    return '[]'
+
+@app.route('/api/v1/treatments.json')
+def treatments():
+    return '[]'
+
+@app.route('/api/v1/profile.json')
+def profile():
+    return '[]'
 
 if __name__ == "__main__":
     app.run(

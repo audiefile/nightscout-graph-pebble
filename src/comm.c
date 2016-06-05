@@ -2,6 +2,7 @@
 #include "app_keys.h"
 #include "config.h"
 #include "comm.h"
+#include "preferences.h"
 #include "staleness.h"
 
 static bool phone_contact = false;
@@ -67,9 +68,14 @@ static void in_received_handler(DictionaryIterator *received, void *context) {
   staleness_update(received);
   int msg_type = dict_find(received, APP_KEY_MSG_TYPE)->value->uint8;
   if (msg_type == MSG_TYPE_DATA) {
-    uint32_t recency = dict_find(received, APP_KEY_RECENCY)->value->uint32;
-    int32_t next_update = SGV_UPDATE_FREQUENCY - recency * 1000;
-    int32_t delay = next_update < LATE_DATA_UPDATE_FREQUENCY ? LATE_DATA_UPDATE_FREQUENCY : next_update;
+    int32_t delay;
+    if (get_prefs()->update_every_minute) {
+      delay = 60 * 1000;
+    } else {
+      uint32_t recency = dict_find(received, APP_KEY_RECENCY)->value->uint32;
+      int32_t next_update = (SGV_UPDATE_FREQUENCY_SECONDS - recency) * 1000;
+      delay = next_update < 0 ? LATE_DATA_UPDATE_FREQUENCY : next_update;
+    }
     schedule_update((uint32_t) delay);
   }
   if (msg_type == MSG_TYPE_ERROR) {
@@ -80,6 +86,9 @@ static void in_received_handler(DictionaryIterator *received, void *context) {
 }
 
 static void in_dropped_handler(AppMessageResult reason, void *context) {
+  // https://developer.getpebble.com/docs/c/Foundation/AppMessage/#AppMessageResult
+  APP_LOG(APP_LOG_LEVEL_DEBUG, "Incoming AppMessage dropped, %d", reason);
+
   update_in_progress = false;
   schedule_update(IN_RETRY_DELAY);
 }
@@ -87,6 +96,12 @@ static void in_dropped_handler(AppMessageResult reason, void *context) {
 static void out_failed_handler(DictionaryIterator *failed, AppMessageResult reason, void *context) {
   update_in_progress = false;
   schedule_update(OUT_RETRY_DELAY);
+}
+
+static void bluetooth_connection_handler(bool connected) {
+  if (connected) {
+    schedule_update(0);
+  }
 }
 
 void init_comm(void (*callback)(DictionaryIterator *received)) {
@@ -103,4 +118,9 @@ void init_comm(void (*callback)(DictionaryIterator *received)) {
   timeout_timer = app_timer_register(timeout_length(), timeout_handler, NULL);
 
   app_message_open(inbound_size, outbound_size);
+
+  // Request data as soon as Bluetooth reconnects
+  connection_service_subscribe((ConnectionHandlers) {
+    .pebble_app_connection_handler = bluetooth_connection_handler
+  });
 }

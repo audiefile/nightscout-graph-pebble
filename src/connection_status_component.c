@@ -1,16 +1,12 @@
 #include "config.h"
 #include "connection_status_component.h"
+#include "fonts.h"
 #include "layout.h"
 #include "staleness.h"
 
 #define REASON_ICON_WIDTH 25
 #define INITIAL_TEXT_SIZE 40
 #define TEXT_PADDING_R 2
-
-// https://forums.getpebble.com/discussion/7147/text-layer-padding
-#define ACTUAL_TEXT_HEIGHT_18 11
-#define PADDING_TOP_18 7
-#define PADDING_BOTTOM_18 3
 
 // This matches STALENESS_REASON_*
 const int CONN_ISSUE_ICONS[] = {
@@ -27,13 +23,14 @@ ConnectionStatusComponent* connection_status_component_create(Layer *parent, int
   layer_set_hidden(bitmap_layer_get_layer(icon_layer), true);
   layer_add_child(parent, bitmap_layer_get_layer(icon_layer));
 
+  FontChoice font = get_font(FONT_18_BOLD);
   TextLayer *staleness_text = text_layer_create(GRect(
     x + REASON_ICON_WIDTH + 1,
-    y + (REASON_ICON_WIDTH - ACTUAL_TEXT_HEIGHT_18) / 2 - PADDING_TOP_18,
+    y + (REASON_ICON_WIDTH - font.height) / 2 - font.padding_top,
     INITIAL_TEXT_SIZE,
-    ACTUAL_TEXT_HEIGHT_18 + PADDING_TOP_18 + PADDING_BOTTOM_18
+    font.height + font.padding_top + font.padding_bottom
   ));
-  text_layer_set_font(staleness_text, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD));
+  text_layer_set_font(staleness_text, fonts_get_system_font(font.key));
   text_layer_set_background_color(staleness_text, element_bg(parent));
   text_layer_set_text_color(staleness_text, element_fg(parent));
   text_layer_set_text_alignment(staleness_text, GTextAlignmentLeft);
@@ -58,17 +55,30 @@ void connection_status_component_destroy(ConnectionStatusComponent *c) {
 
 static char* staleness_text(int staleness_seconds) {
   static char buf[8];
-  int minutes = staleness_seconds / 60;
+  int minutes = ((float)staleness_seconds / 60.0f) + 0.5f;
+  int hours = minutes / 60;
   if (minutes < 60) {
     snprintf(buf, sizeof(buf), "%d", minutes);
-  } else if (minutes < 120) {
-    snprintf(buf, sizeof(buf), "1h%d", minutes - 60);
-  } else if (minutes / 60 <= 6) {
-    snprintf(buf, sizeof(buf), "%dhr", minutes / 60);
+  } else if (hours < 10 && minutes % 60 > 0) {
+    snprintf(buf, sizeof(buf), "%dh%d", hours, minutes - 60 * hours);
+  } else if (hours < 100) {
+    snprintf(buf, sizeof(buf), "%dh", hours);
   } else {
     strcpy(buf, "!");
   }
   return buf;
+}
+
+static void resize_text_frame(ConnectionStatusComponent *c, int16_t width) {
+  GRect frame = layer_get_frame(text_layer_get_layer(c->staleness_text));
+  layer_set_frame(text_layer_get_layer(c->staleness_text), GRect(
+    frame.origin.x, frame.origin.y, width, frame.size.h
+  ));
+}
+
+static void trim_text_frame(void *callback_data) {
+  ConnectionStatusComponent *c = callback_data;
+  resize_text_frame(c, text_layer_get_content_size(c->staleness_text).w);
 }
 
 void connection_status_component_refresh(ConnectionStatusComponent *c) {
@@ -87,12 +97,9 @@ void connection_status_component_refresh(ConnectionStatusComponent *c) {
     layer_set_hidden(text_layer_get_layer(c->staleness_text), false);
     text_layer_set_text(c->staleness_text, staleness_text(issue.staleness));
 
-    GRect frame = layer_get_frame(text_layer_get_layer(c->staleness_text));
-    layer_set_frame(text_layer_get_layer(c->staleness_text), GRect(
-      frame.origin.x,
-      frame.origin.y,
-      text_layer_get_content_size(c->staleness_text).w + TEXT_PADDING_R,
-      frame.size.h
-    ));
+    // XXX: need this on Basalt, but not on Aplite or emulator
+    resize_text_frame(c, INITIAL_TEXT_SIZE);
+    layer_mark_dirty(text_layer_get_layer(c->staleness_text));
+    app_timer_register(100, trim_text_frame, c);
   }
 }
